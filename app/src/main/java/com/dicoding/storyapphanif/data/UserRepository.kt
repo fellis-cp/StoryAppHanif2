@@ -4,6 +4,10 @@ package com.dicoding.storyapphanif.data
 import android.location.Location
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.liveData
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.liveData
 import com.dicoding.storyapphanif.data.pref.UserModel
 import com.dicoding.storyapphanif.data.pref.UserPreference
 import com.dicoding.storyapphanif.data.retrofit.ApiService
@@ -84,16 +88,17 @@ class UserRepository private constructor(
             }
         }
 
-    fun getStory(token: String): LiveData<Result<List<ListStoryItem>>> = liveData(Dispatchers.IO) {
-            emit(Result.Loading)
-            try {
-                val response = apiService.getStory("Bearer $token")
-                val storyList = response.listStory
-                emit(Result.Success(storyList))
-            } catch (e: Exception) {
-                emit(Result.Error(e.message.toString()))
+    fun getStory(token: String): LiveData<PagingData<ListStoryItem>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 5
+            ),
+            pagingSourceFactory = {
+                StoryPaggingSource("Bearer $token", apiService)
             }
-        }
+        ).liveData
+
+    }
 
     fun storyWithLocation(token: String): LiveData<Result<List<ListStoryItem>>> = liveData(Dispatchers.IO) {
             emit(Result.Loading)

@@ -44,5 +44,12 @@
     <string name="empty_warning">No image selected</string>
     <string name="desc_empty">Please fill out the description</string>
     <string name="title_activity_maps">MapsActivity</string>
+    <string name="location_upload_text">Add Your Current Location</string>
+    <string name="no_location">Location is not available</string>
+    <string name="gps_tittle">Your GPS is not active</string>
+    <string name="gps_message">Please turn on your GPS to share your location</string>
+    <string name="refresh">Refresh\n</string>
+    <string name="map">Map\n</string>
+    <string name="logout_menu">Logout\n</string>
 
 </resources>

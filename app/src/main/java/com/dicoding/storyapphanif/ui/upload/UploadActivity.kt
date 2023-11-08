@@ -1,19 +1,27 @@
 package com.dicoding.storyapphanif.ui.upload
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
+import android.provider.Settings
 import android.view.View
+import android.widget.CompoundButton
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.dicoding.storyapphanif.R
 import com.dicoding.storyapphanif.data.Result
 import com.dicoding.storyapphanif.databinding.ActivityUploadBinding
@@ -23,10 +31,16 @@ import com.dicoding.storyapphanif.ui.main.MainActivity
 import com.dicoding.storyapphanif.ui.reduceImage
 import com.dicoding.storyapphanif.ui.uriToFile
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 class UploadActivity : AppCompatActivity() {
 
@@ -36,21 +50,22 @@ class UploadActivity : AppCompatActivity() {
     private lateinit var uploadViewModel: UploadViewModel
     private var currentImageUri : Uri? = null
 
-
     private val reqPermissionLauncher =
         registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { isGranted: Boolean ->
-            if (isGranted) {
-                Toast.makeText(this, "Permission request granted", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "Permission request denied", Toast.LENGTH_LONG).show()
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            when {
+                permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false -> {
+                    getMyLastLocation()
+                }
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false -> {
+                    getMyLastLocation()
+                }
+                else -> {
+                    binding.switchLocation.isChecked = false
+                }
             }
         }
-
-    private fun allPermGranted () = ContextCompat.checkSelfPermission(this ,REQUIRED_PERMISSION) ==
-        PackageManager.PERMISSION_GRANTED
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityUploadBinding.inflate(layoutInflater)
@@ -61,10 +76,6 @@ class UploadActivity : AppCompatActivity() {
 
         val factory :  ViewModelFactory = ViewModelFactory.getInstance(this)
         uploadViewModel = ViewModelProvider(this , factory)[UploadViewModel::class.java]
-
-        if (!allPermGranted()){
-            reqPermissionLauncher.launch(REQUIRED_PERMISSION)
-        }
 
         uploadViewModel.responseUploadStory.observe(this) {
             when (it) {
@@ -96,6 +107,20 @@ class UploadActivity : AppCompatActivity() {
         binding.galleryButton.setOnClickListener { startGallery() }
         binding.cameraButton.setOnClickListener { startCamera() }
         binding.uploadButton.setOnClickListener { uploadStart() }
+        binding.switchLocation.setOnCheckedChangeListener { _: CompoundButton?, isChecked: Boolean ->
+            if (isChecked) {
+                if (!areGPSEnabled()) {
+                    gpsDialogShow()
+                }
+                lifecycleScope.launch {
+                    getMyLastLocation()
+                }
+            } else {
+                currentLocation = null
+            }
+        }
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
     }
 
@@ -179,11 +204,78 @@ class UploadActivity : AppCompatActivity() {
             PackageManager.PERMISSION_GRANTED
     }
 
-
-
-    companion object {
-        private const val REQUIRED_PERMISSION = Manifest.permission.CAMERA
+    private fun areGPSEnabled(): Boolean {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
+
+    private val locationCallback = object : LocationCallback(){
+        override fun onLocationResult(locationResult: LocationResult) {
+            currentLocation = locationResult.lastLocation
+        }
+    }
+
+    private fun getNewLocation(){
+        Toast.makeText(this.baseContext,"Get New Location", Toast.LENGTH_SHORT).show()
+        val locationRequest =  LocationRequest()
+        locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        locationRequest.interval = TimeUnit.SECONDS.toMillis(1)
+        locationRequest.fastestInterval = 0
+        locationRequest.numUpdates = 1
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        )
+            Looper.myLooper()?.let {
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,locationCallback, it
+                )
+            }
+    }
+    @SuppressLint("MissingPermission")
+    private fun getMyLastLocation() {
+        if (permCheck(Manifest.permission.ACCESS_FINE_LOCATION) &&
+            permCheck(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    currentLocation = location
+                } else {
+                    Toast.makeText(
+                        this,
+                    R.string.no_location,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    getNewLocation()
+                }
+            }
+        } else {
+            reqPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    private fun gpsDialogShow() {
+        AlertDialog.Builder(this).apply {
+            setTitle(getString(R.string.gps_tittle))
+            setMessage(getString(R.string.gps_message))
+            setPositiveButton(getString(R.string.dialog_positive_button)) { _, _ ->
+                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivity(intent)
+            }
+            create()
+            show()
+        }
+    }
+
 }
 
 

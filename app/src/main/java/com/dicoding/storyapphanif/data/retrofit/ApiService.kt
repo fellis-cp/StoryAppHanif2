@@ -32,7 +32,9 @@ interface ApiService {
     @GET("stories")
     suspend fun getStory(
         @Header("Authorization") token: String,
-    ): StoryResponse
+        @Query("page") page: Int = 1,
+        @Query("size") size: Int = 20
+    ):StoryResponse
 
 
     @FormUrlEncoded

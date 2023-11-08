@@ -40,16 +40,11 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyA_cf22iAeGcK_qCYWEkoo627V6VxJMhZE" />
 
+
         <activity
             android:name=".ui.map.MapsActivity"
-            android:exported="true"
-            android:label="@string/title_activity_maps" >
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:label="@string/title_activity_maps" />
         <activity
             android:name=".ui.detail.DetailActivity"
             android:exported="false" />

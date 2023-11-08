@@ -4,12 +4,13 @@
 
 
     <item
-    android:id="@+id/menu_maps"
+    android:id="@+id/menu_maps" android:title="@string/map"
     android:icon="@drawable/baseline_map_24"
     app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_logout"
+        android:title="@string/logout_menu"
         android:icon="@drawable/baseline_login_24"
         app:showAsAction="always" />
 </menu>
